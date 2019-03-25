@@ -1,7 +1,8 @@
 """
     @nghia nh
     Preprocessing Abalone data
-    ===
+    ---
+
     The dataset itselt is vectorized with only sex feature
     need to be normalizing (I=0,M=1,F=2).
     This script only keeps the classes with instances number > 100: class 5-15.
@@ -11,6 +12,7 @@
 
 import unittest
 import logging
+
 import pandas as pd
 
 
@@ -28,6 +30,11 @@ class AbaloneData:
         self.abalone_df = self.abalone_df[(self.abalone_df['Rings'] >= 5) & (self.abalone_df['Rings'] <= 15)]
 
     def get_binary_class_data(self, positive_label_list):
+        """
+        return binary classification data set
+        :param positive_label_list: list of label will be set positive
+        :return: ndarray pair of (x, y)
+        """
         logging.info('AbaloneData getBinaryInput with positive_label_list = %s', positive_label_list)
         # return binary classification dataset
         x = self.abalone_df.drop(columns=['Rings']).values
@@ -69,7 +76,7 @@ class TestAbaloneData(unittest.TestCase):
         self.assertTrue(all(expected_rings == self.data.abalone_df['Rings']), 'Wrong Rings feature')
 
     def test_getBinaryInput(self):
-        x, y = self.data.get_binary_class_data(7)
+        x, y = self.data.get_binary_class_data([7])
         # size verify
         self.assertTrue((len(x), len(y)) == (6, 6),
                         'Wrong train_test split size')

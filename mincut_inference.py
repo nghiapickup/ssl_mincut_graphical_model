@@ -1,7 +1,7 @@
 """
     @nghia nh
-    Mincut algorithm inference
-    ===
+    Mincut approach inference
+    ---
 """
 
 import logging
@@ -12,10 +12,14 @@ from igraph import *
 
 
 class MincutInference:
-    def __init__(self, graph):
+    def __init__(self, i_graph):
+        """
+        Setup graph for mincut: add 2 more pseudo vertices and related edges
+        :param i_graph: input graph as Graph instance of igraph
+        """
         logging.info('MincutInference __init__')
 
-        self._graph = graph
+        self._graph = i_graph
         self._cut = None
         self._graph.add_vertices(2)  # add v+ and v-
 
@@ -38,7 +42,10 @@ class MincutInference:
         return self._cut
 
     def inference(self):
-        # mincut on new graph
+        """
+        inference mincut on input graph
+        :return:
+        """
         self._cut = self._graph.st_mincut(source=self._v_plus, target=self._v_minus, capacity='weight')
         self._graph.delete_vertices([self._v_minus, self._v_plus])
         # set label
@@ -72,5 +79,5 @@ class TestMincutInference(unittest.TestCase):
         self.assertEqual(self.model.get_cut.value, 17)
 
     def test_get_label(self):
-        expected_y = [1,1,1,1,0,0,0,0,0,1,0,0]
-        self.assertTrue(expected_y == self.model.get_label)
+        expected_y = np.array([1,1,1,1,0,0,0,0,0,1,0,0])
+        self.assertTrue(np.array_equal(expected_y, self.model.get_label))

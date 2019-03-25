@@ -1,7 +1,7 @@
 """
     @nghia nh
     Graphical model inference
-    ===
+    ---
 """
 
 import logging
@@ -13,13 +13,15 @@ from igraph import *
 
 
 class GraphicalModelWithMST:
-    """
-    Hard-implement for simple graph with minimum spanning tree like components, binary classification
-    """
-    def __init__(self, graph_ig):
+    def __init__(self, i_graph):
+        """
+        Hard-implement for simple graph with
+        minimum spanning tree like components, binary classification
+        :param i_graph: input graph as Graph instance of igraph
+        """
         logging.info('GraphicalModel __init__')
 
-        self._graph = graph_ig
+        self._graph = i_graph
         self._vertices_num = self._graph.vcount()
 
         self._component_root = []  # list of component's roots
@@ -40,11 +42,19 @@ class GraphicalModelWithMST:
         return message
 
     def inference(self):
+        """
+        inference process
+        :return:
+        """
         self._tree_extract()
         self._message_sending()
         self._label_retrieving()
 
     def _tree_extract(self):
+        """
+        Extract graph input to tree search list (from leaf to root)
+        :return:
+        """
         bfs = deque([])
         free = np.ones(self._vertices_num, bool)
         # consider multi-component graph
@@ -68,6 +78,10 @@ class GraphicalModelWithMST:
                             ne['parent'] = parent.index
 
     def _message_sending(self):
+        """
+        sending message from leaf to root and save the trace
+        :return:
+        """
         for sender in reversed(self._inference_route):
             receiver = self._graph.vs[sender['parent']]
             ne_list = sender.neighbors()
@@ -90,6 +104,10 @@ class GraphicalModelWithMST:
             self._vs_message[sender.index] = message[[0, 1], self._vs_trace[sender.index]].ravel()  # :3
 
     def _label_retrieving(self):
+        """
+        retrieve label from trace
+        :return:
+        """
         for i in self._component_root:
             self._graph.vs[i]['label'] = self._vs_trace[i, 0]
             for trace_back in self._inference_route:
@@ -221,6 +239,6 @@ class TestGraphicalModelWithTree(unittest.TestCase):
         self.assertTrue(np.array_equal(expected_trace, trace))
 
     def test_get_label(self):
-        expected_label = [0,1,1,1,0,0,0,0,0,0,0,0]
+        expected_label = np.array([0,1,1,1,0,0,0,0,0,0,0,0])
         label = self.model.get_label
-        self.assertTrue(expected_label == label)
+        self.assertTrue(np.array_equal(expected_label, label))

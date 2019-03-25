@@ -1,7 +1,7 @@
 """
     @nghia nh
     Preprocessing Mushroom data
-    ===
+    ---
 
     All features are categotical data. Then we need to convert them into
     a reasonable meaning which can calc the distance. For each unique value of
@@ -11,6 +11,7 @@
 
 import unittest
 import logging
+
 import pandas as pd
 import numpy as np
 
@@ -33,15 +34,25 @@ class MushroomData:
         self.mushroom_df = self.mushroom_df.drop(columns=['veil-type', 'stalk-root'])
 
     def get_basic_data(self):
-        """return basic data without converting yet"""
+        """
+        return basic data without converting yet
+        :return: ndarray pair (x,y)
+        """
+        logging.info('MushroomData get_basic_data')
         x = self.mushroom_df.drop(columns='class').values
         y = self.mushroom_df['class'].values
         return x, y
 
     def get_scalar_data(self, train_index, test_index):
-        """ Convert categorical value to scalar.
+        """
+        Convert categorical value to scalar.
         Each unique value in one feature will transfer to its proportion of edible (e/(e + p)).
-        Notice that this calculation works train set and apply the same scale for test set"""
+        Notice that this calculation only works on train set and apply the same scale for test set
+        :param train_index: indices of instances (in full data set) using for train set
+        :param test_index: indices of instances (in full data set) using for test set
+        :return:
+        """
+        logging.info('MushroomData get_scalar_data')
         x = self.mushroom_df.iloc[train_index]
         x_train = x.drop(columns=['class'])
         x_test = self.mushroom_df.iloc[test_index].drop(columns=['class'])

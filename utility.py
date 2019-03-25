@@ -1,6 +1,10 @@
 """
     @nghia nh
-    ===
+    Support functions
+    ---
+
+    search parameters, export results, ...
+
 """
 
 import copy
@@ -20,7 +24,12 @@ knn_parameters_form = {'start': 0, 'stop': 0, 'step': 0}  # linear space
 
 
 def sum_classification_report(x1, x2):
-    """return sum of 2 classification_report x1, x2"""
+    """
+    return sum of 2 classification_report as classification_report_form
+    :param x1: classification_report
+    :param x2: classification_report
+    :return:
+    """
     result = copy.deepcopy(classification_report_form)
     for n1, n2, n3 in zip(x1, x2, result):
         for v1, v2, v3 in zip(x1[n1], x2[n2], result[n3]):
@@ -29,7 +38,14 @@ def sum_classification_report(x1, x2):
 
 
 def export_cumulative_result(filename, message, data, cumul_scale=1.0):
-    """divide by cumul_scale and export cumulative result to file."""
+    """
+     Export cumulative result to file
+    :param filename: file to export
+    :param message: name of export content
+    :param data: classification_report_form
+    :param cumul_scale: scale of export result
+    :return:
+    """
     with open(filename, 'a') as f:
         f.writelines('\n' + message + '\n')
         f.write("\n%15s%10s%10s%10s%10s\n" %
@@ -42,6 +58,12 @@ def export_cumulative_result(filename, message, data, cumul_scale=1.0):
 
 
 def error_rate(y_predict, y_true):
+    '''
+    calc error rate
+    :param y_predict: predicted label
+    :param y_true: true label
+    :return:
+    '''
     data_len = len(y_predict)
     y_np_predict = np.array(y_predict).reshape(data_len, 1)
     y_np_true = np.array(y_true).reshape(data_len, 1)
@@ -49,6 +71,13 @@ def error_rate(y_predict, y_true):
 
 
 def search_mincut_knn(x, y, knn_parameters):
+    """
+    search the best k for mincut approach using knn graph
+    :param x: train data
+    :param y: train label
+    :param knn_parameters: k search range
+    :return: k with lowest error rate
+    """
     logging.info('search_mincut_knn')
 
     search_list = np.arange(knn_parameters['start'],
@@ -80,6 +109,14 @@ def search_mincut_knn(x, y, knn_parameters):
 
 
 def ssl_mincut_knn(x_l, y_l, x_u, knn_paras):
+    """
+    train mincut approach with knn graph
+    :param x_l: labeled data
+    :param y_l: labeled label
+    :param x_u: unlabeled data
+    :param knn_paras: k search range
+    :return: predicted label for x_u
+    """
     logging.info('Train ssl_mincut_knn')
 
     train_graph = GraphConstruction(x_l, y_l, x_u)
@@ -87,13 +124,20 @@ def ssl_mincut_knn(x_l, y_l, x_u, knn_paras):
     train_graph.construct_knn_graph(k=k_best)
     mincut = MincutInference(train_graph.get_graph)
     mincut.inference()
-    y_predict = mincut.get_label[-train_graph.get_unlabeled_data_number:]
+    y_mincut_predict = mincut.get_label[-train_graph.get_unlabeled_data_number:]
 
     # return only unlabeled label
-    return y_predict
+    return y_mincut_predict
 
 
 def ssl_mincut_mst(x_l, y_l, x_u):
+    """
+    train mincut approach with minimum spanning tree component graph
+    :param x_l: labeled data
+    :param y_l: labeled label
+    :param x_u: unlabeled data
+    :return: predicted label for x_u
+    """
     logging.info('ssl_mincut_mst')
 
     train_graph = GraphConstruction(x_l, y_l, x_u)
@@ -107,6 +151,13 @@ def ssl_mincut_mst(x_l, y_l, x_u):
 
 
 def ssl_graphical_mst(x_l, y_l, x_u):
+    """
+    train graphical model with minimum spanning tree component graph
+    :param x_l: labeled data
+    :param y_l: labeled label
+    :param x_u: unlabeled data
+    :return: predicted label for x_u
+    """
     logging.info('ssl_graphical_mst')
 
     train_graph = GraphConstruction(x_l, y_l, x_u)
@@ -120,6 +171,13 @@ def ssl_graphical_mst(x_l, y_l, x_u):
 
 
 def search_mincut_knn_mst(x, y, knn_parameters):
+    """
+    search the best k for mincut approach using knn graph and minimum spanning tree
+    :param x: train data
+    :param y: train label
+    :param knn_parameters: k search range
+    :return: k with lowest error rate
+    """
     logging.info('search_mincut_knn_mst')
 
     search_list = np.arange(knn_parameters['start'],
@@ -152,6 +210,13 @@ def search_mincut_knn_mst(x, y, knn_parameters):
 
 
 def search_graphical_knn_mst(x, y, knn_parameters):
+    """
+    search the best k for graphical model using knn graph and minimum spanning tree
+    :param x: train data
+    :param y: train label
+    :param knn_parameters: k search range
+    :return: k with lowest error rate
+    """
     logging.info('search_graphical_knn_mst')
 
     search_list = np.arange(knn_parameters['start'],
@@ -184,6 +249,14 @@ def search_graphical_knn_mst(x, y, knn_parameters):
 
 
 def ssl_mincut_knn_mst(x_l, y_l, x_u, knn_paras):
+    """
+    train mincut approach with knn graph and minimum spanning tree
+    :param x_l: labeled data
+    :param y_l: labeled label
+    :param x_u: unlabeled data
+    :param knn_paras: k search range
+    :return: predicted label for x_u
+    """
     logging.info('ssl_mincut_knn_mst')
 
     train_graph = GraphConstruction(x_l, y_l, x_u)
@@ -199,6 +272,14 @@ def ssl_mincut_knn_mst(x_l, y_l, x_u, knn_paras):
 
 
 def ssl_graphical_knn_mst(x_l, y_l, x_u, knn_paras):
+    """
+    train graphical model with knn graph and minimum spanning tree
+    :param x_l: labeled data
+    :param y_l: labeled label
+    :param x_u: unlabeled data
+    :param knn_paras: k search range
+    :return: predicted label for x_u
+    """
     logging.info('ssl_graphical_knn_mst')
 
     train_graph = GraphConstruction(x_l, y_l, x_u)
@@ -207,10 +288,10 @@ def ssl_graphical_knn_mst(x_l, y_l, x_u, knn_paras):
     train_graph.construct_mst_graph()
     graphical_knn_mst = GraphicalModelWithMST(train_graph.get_graph)
     graphical_knn_mst.inference()
-    y_mincut_predict = graphical_knn_mst.get_label[-train_graph.get_unlabeled_data_number:]
+    y_graphical_predict = graphical_knn_mst.get_label[-train_graph.get_unlabeled_data_number:]
 
     # return only unlabeled label
-    return y_mincut_predict
+    return y_graphical_predict
 
 
 # TODO Finish unittest

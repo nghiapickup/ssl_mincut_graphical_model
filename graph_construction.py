@@ -1,13 +1,14 @@
 """
     @nghia nh
     Graph construction
-    ===
+    ---
 """
 
 import unittest
+import logging
+
 import numpy as np
 from igraph import *
-import logging
 
 
 class GraphConstruction:
@@ -37,6 +38,10 @@ class GraphConstruction:
         return self._unlabeled_data_number
 
     def __euclidean(self):
+        """
+        Calc distance metric using euclidean
+        :return:
+        """
         # TODO matrix calc here
         for i in range(len(self._x)):
             for j in range(i+1, len(self._x)):
@@ -44,6 +49,12 @@ class GraphConstruction:
                 self._graph[j, i] = self._graph[i, j]
 
     def construct_knn_graph(self, k=3):
+        """
+        Construct graph using KNN approach.
+        It guarantees that at least 1 nearest neighbor is labeled data.
+        :param k: number of nearest neighbors
+        :return:
+        """
         logging.info('construct_knn_graph with k = %s', k)
 
         knn_adj_matrix = np.zeros((len(self._x),len(self._x)), dtype=bool)
@@ -66,6 +77,10 @@ class GraphConstruction:
             self._graph[vertex_id, np.nonzero(~row)[0]] = 0
 
     def construct_mst_graph(self):
+        """
+        Construct graph using minimum spanning tree for each graph's component
+        :return:
+        """
         logging.info('construct_mst_graph')
 
         edges_indices = self._graph.spanning_tree(weights=self._graph.es['weight'], return_tree=False)
@@ -79,7 +94,7 @@ class TestGraphConstruction(unittest.TestCase):
     # x_l
     x_l = np.array([(1, 1), (2, 3), (3, 5)])
     # y_l
-    y_l = np.array([0, 1, 1]).reshape(3, 1)
+    y_l = np.array([0, 1, 1])
     # x_u
     x_u = np.array([(4, 0), (1, 0)])
     #

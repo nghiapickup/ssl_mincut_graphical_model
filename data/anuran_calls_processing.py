@@ -1,13 +1,15 @@
 """
     @nghia nh
     Preprocessing Anuran Calls (MFCCs) data
-    ===
+    ---
+
     This is quite standard format dataset with normalized values
     Then this script only construct Family label classification data.
 """
 
 import unittest
 import logging
+
 import pandas as pd
 
 
@@ -30,8 +32,8 @@ class AnuranCallData:
         y = self.anuran_df['Family'].values
         return x, y
 
-class TestAbaloneData(unittest.TestCase):
 
+class TestAbaloneData(unittest.TestCase):
     def setUp(self):
         self.data = AnuranCallData('anuran_calls/Frogs_MFCCs.csv')
         self.x, self.y = self.data.get_binary_class_data()
