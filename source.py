@@ -1,20 +1,34 @@
 """
     @nghia nh
-    ===
-"""
+    ---
+    Test cases
 
+"""
+import logging
+
+import numpy as np
+from sklearn.pipeline import Pipeline
+from sklearn.model_selection import ParameterGrid
 from sklearn.metrics import classification_report
+from sklearn.base import BaseEstimator, ClassifierMixin, TransformerMixin
+from sklearn.model_selection import StratifiedShuffleSplit
 
 from data.abalone_processing import AbaloneData
 from data.mushroom_processing import MushroomData
 from data.anuran_calls_processing import AnuranCallData
-from utility import *
+from data.newsgroups_processing import NewsgroupsData
+from graph_construction import GraphConstruction
+from mincut_inference import MincutInference
+from graphical_model_inference import GraphicalModelWithTree
+from utility import ResultExporter, ParamSearch
+
 
 # log config
 LOG_FILE = 'source.log'
-logging.basicConfig()
 
-logFormatter = logging.Formatter("%(asctime)s [%(threadName)-12.12s] [%(levelname)-5.5s]  %(message)s")
+logFormatter = logging.Formatter(
+    "%(asctime)s [%(threadName)-12.12s] "
+    "[%(levelname)-5.5s]  %(message)s")
 rootLogger = logging.getLogger()
 rootLogger.setLevel(logging.DEBUG)
 
@@ -22,275 +36,295 @@ fileHandler = logging.FileHandler(LOG_FILE)
 fileHandler.setFormatter(logFormatter)
 rootLogger.addHandler(fileHandler)
 
-consoleHandler = logging.StreamHandler()
-consoleHandler.setFormatter(logFormatter)
-rootLogger.addHandler(consoleHandler)
-
-logging.basicConfig(filename=LOG_FILE, level=logging.DEBUG,
-                    format='%(asctime)s %(levelname)s: %(message)s',
-                    datefmt='%m/%d/%Y %I:%M:%S %p')
+# consoleHandler = logging.StreamHandler()
+# consoleHandler.setFormatter(logFormatter)
+# rootLogger.addHandler(consoleHandler)
 
 
-def abalone_experiment(positive_rings, unlabeled_size=0.5):
+###############################################################################
+# transformer and classifier interface
+
+class GraphTransformer(BaseEstimator, TransformerMixin):
+    def __init__(self, graph_type='knn', metric='euclidean'):
+        self.graph_type = graph_type
+        self.metric = metric
+        self.transformer = None
+
+    def fit(self, x, y_l, **kwargs_graph):
+        self.transformer = GraphConstruction(x_l=x[0], y_l=y_l,
+                                             x_u=x[1], metric=self.metric)
+        self.transformer.construct_graph(graph_type=self.graph_type, **kwargs_graph)
+
+        return self
+
+    def transform(self, x=None):
+        return self.transformer
+
+
+class GraphInference(BaseEstimator, ClassifierMixin):
+    def __init__(self, model_type='mincut'):
+        self.model_map = {
+            'mincut': MincutInference,
+            'graphical_tree': GraphicalModelWithTree
+        }
+        self.model_type = model_type
+
+        self.inference = None
+        self.unlabeled_number = None
+
+    def fit(self, graph_constructor, y=None):
+        self.unlabeled_number = graph_constructor.x_u_number
+
+        try:
+            self.inference = self.model_map[self.model_type](graph_constructor.graph)
+        except KeyError:
+            logging.error('GraphInference: Non supported model %s.' % self.model_type)
+            raise
+
+        self.inference.inference()
+
+        return self
+
+    def transform(self, x=None):
+        pass
+
+    def predict(self, x=None, y=None):
+        return self.inference.labels[-self.unlabeled_number:]
+
+
+###############################################################################
+# Experiment setup
+
+class Experiment():
+    def __init__(self, data_processor, result_filename):
+        self.cv_fold_number = 5
+        self.knn_param = {'start': 1, 'stop': 10, 'step': 1}
+
+        self.mincut_param = {
+            'infer__model_type': ['mincut'],
+            'trans__metric': ['euclidean', 'rbf', 'cosine'],
+            'trans__graph_type': ['knn', 'mst', 'knn_mst']}
+        self.graphical_tree_param = {
+            'infer__model_type': ['graphical_tree'],
+            'trans__metric': ['euclidean', 'rbf', 'cosine'],
+            'trans__graph_type': ['mst', 'knn_mst']}
+
+        self.param_grid = ParameterGrid([self.mincut_param, self.graphical_tree_param])
+
+        # setup pipeline
+        self.experiment_pipeline = Pipeline([
+            ('trans', GraphTransformer()),
+            ('infer', GraphInference())])
+
+        self.data_processor = data_processor.transform()
+        self.result_filename = result_filename
+
+    def process_ssl(self, unlabeled_size=0.5):
+
+        # cumulative results
+        result = []
+        for param_set in self.param_grid:
+            result.append(ResultExporter(
+                param_set['infer__model_type'] + '_' +\
+                param_set['trans__metric'] + '_' + \
+                param_set['trans__graph_type'])
+            )
+
+        # split labeled and unlabeled set
+        sss_data = StratifiedShuffleSplit(n_splits=self.cv_fold_number,
+                                          test_size=unlabeled_size,
+                                          random_state=0)
+        for train_index, test_index in sss_data.split(np.zeros(self.data_processor.x_number), self.data_processor.y):
+            x_l, y_l, x_u, y_u = self.data_processor.extract(train_index, test_index)
+
+            for test_id, param_set in enumerate(self.param_grid):
+
+                # set basic params first
+                self.experiment_pipeline.set_params(**param_set)
+
+                # cv search parameter if necessary
+
+                # graph_param: search k for KNN graph on labeled set
+                k=0
+                if 'knn' in param_set['trans__graph_type']:
+                    k = ParamSearch.knn_graph_search(
+                        x_l, y_l,
+                        self.experiment_pipeline,
+                        self.knn_param)
+
+                y_u_predict = self.experiment_pipeline.fit(
+                    [x_l, x_u], y_l, trans__k=k).predict(None)
+
+                # only sum score on y_u
+                result[test_id].sum_report(classification_report(y_u, y_u_predict, output_dict=True))
+
+        # export result
+        for test_case in result:
+            test_case.export(self.result_filename, scale=self.cv_fold_number)
+
+
+###############################################################################
+# Test case
+
+data_folder_dir = {
+    'abalone': 'data/abalone/',
+    'mushroom': 'data/mushroom/',
+    'anuran': 'data/anuran_calls/',
+    '20news': 'data/20newsbydate/'
+}
+
+data_dir = {
+    'abalone': data_folder_dir['abalone'] + AbaloneData.default_filename,
+    'mushroom': data_folder_dir['mushroom'] + MushroomData.default_filename,
+    'anuran': data_folder_dir['anuran'] + AnuranCallData.default_filename,
+    '20news': data_folder_dir['20news'] + NewsgroupsData.default_file_folder
+}
+
+
+def abalone_experiment(file_dir, positive_rings, unlabeled_size=0.5):
     """
-    Experiment on Abalone dataset, only binary classifier
+    Experiment on Abalone data, binary classifier
+
+    Class distribution(training set)
+    5	115
+    6	259
+    7	391
+    8	568
+    9	689
+    10	634
+    11	487
+    12	267
+    13	203
+    14	126
+    15	103
+    :param file_dir: data file location
     :param positive_rings: Value or list of values for positive label
     :param unlabeled_size: size of unlabeled data
     :return: result export to file result_file_name
     """
     logging.info('Start Abalone Experiment')
-    data = AbaloneData('data/abalone/abalone.data.source.test.txt')  # test
-    # data = AbaloneData('data/abalone/' + AbaloneData.default_file_name)
 
-    # Class distribution(training set)
-    #   5	115
-    # 	6	259
-    # 	7	391
-    # 	8	568
-    # 	9	689
-    # 	10	634
-    # 	11	487
-    # 	12	267
-    # 	13	203
-    # 	14	126
-    # 	15	103
-
-    x, y = data.get_binary_class_data(positive_rings)
-
-    # spit with cv fold = 5
-    cv_fold_number = 5
-
-    # cumulative results
     result_file_name = 'abalone_experiment.out'
-    ssl_mincut_knn_result = copy.deepcopy(classification_report_form)
-    ssl_graphical_mst_result = copy.deepcopy(classification_report_form)
-    ssl_mincut_mst_result = copy.deepcopy(classification_report_form)
-    ssl_mincut_knn_mst_result = copy.deepcopy(classification_report_form)
-    ssl_graphical_knn_mst_result = copy.deepcopy(classification_report_form)
+    data_processor = AbaloneData(file_dir, positive_labels=positive_rings)
 
-    # split labeled and unlabeled set
-    sss_data = StratifiedShuffleSplit(n_splits=cv_fold_number, test_size=unlabeled_size, random_state=0)
-    for train_index, test_index in sss_data.split(x, y):
-        x_l = x[train_index]
-        y_l = y[train_index]
-        x_u = x[test_index]
-        y_u = y[test_index]
-        knn_paras = copy.deepcopy(knn_parameters_form)
-        knn_paras['start'] = 1
-        knn_paras['stop'] = 15
-        knn_paras['step'] = 1
-
-        # (method 1) SSL mincut using KNN graph
-        y_u_predict_mincut_knn = ssl_mincut_knn(x_l, y_l, x_u, knn_paras)
-
-        # (method 2 & 3)
-        # SSL graphical model and mincut using minimum spanning tree graph
-        # 2 methods may use 2 different trees
-        y_u_predict_mincut_mst = ssl_mincut_mst(x_l, y_l, x_u)
-        y_u_predict_graphical_mst = ssl_graphical_mst(x_l, y_l, x_u)
-
-        # (method 4 & 5)
-        # SSL graphical model and mincut using minimum spanning trees on KNN graph's components
-        y_u_predict_mincut_knn_mst = ssl_mincut_knn_mst(x_l, y_l, x_u, knn_paras)
-        y_u_predict_graphical_knn_mst = ssl_graphical_knn_mst(x_l, y_l, x_u, knn_paras)
-
-        ssl_mincut_knn_result = sum_classification_report(
-            ssl_mincut_knn_result,
-            classification_report(y_u, y_u_predict_mincut_knn, output_dict=True))
-        ssl_graphical_mst_result = sum_classification_report(
-            ssl_graphical_mst_result,
-            classification_report(y_u, y_u_predict_graphical_mst, output_dict=True))
-        ssl_mincut_mst_result = sum_classification_report(
-            ssl_mincut_mst_result,
-            classification_report(y_u, y_u_predict_mincut_mst, output_dict=True))
-        ssl_mincut_knn_mst_result = sum_classification_report(
-            ssl_mincut_knn_mst_result,
-            classification_report(y_u, y_u_predict_mincut_knn_mst, output_dict=True))
-        ssl_graphical_knn_mst_result = sum_classification_report(
-            ssl_graphical_knn_mst_result,
-            classification_report(y_u, y_u_predict_graphical_knn_mst, output_dict=True))
-
-    # export result
-    export_cumulative_result(result_file_name, "ssl_mincut_knn_result",
-                             ssl_mincut_knn_result, cumul_scale=cv_fold_number)
-    export_cumulative_result(result_file_name, "ssl_graphical_mst_result",
-                             ssl_graphical_mst_result, cumul_scale=cv_fold_number)
-    export_cumulative_result(result_file_name, "ssl_mincut_mst_result",
-                             ssl_mincut_mst_result, cumul_scale=cv_fold_number)
-    export_cumulative_result(result_file_name, "ssl_mincut_knn_mst_result",
-                             ssl_mincut_knn_mst_result, cumul_scale=cv_fold_number)
-    export_cumulative_result(result_file_name, "ssl_graphical_knn_mst_result",
-                             ssl_graphical_knn_mst_result, cumul_scale=cv_fold_number)
+    exp = Experiment(data_processor, result_file_name)
+    exp.process_ssl(unlabeled_size=unlabeled_size)
 
 
-def mushroom_experiment(unlabeled_size=0.5):
+def mushroom_experiment(file_dir, unlabeled_size=0.5):
+    """
+    Experiment on Mushroom data, binary classifier
 
+    Class Distribution:
+    edible:     4208 (51.8 %)
+    poisonous:  3916 (48.2 %)
+    total:      8124 instances
+    :param file_dir: data file location
+    :param unlabeled_size: size of unlabeled data
+    :return: result export to file result_file_name
+    """
     logging.info('Start Mushroom Experiment')
-    data = MushroomData('data/mushroom/agaricus-lepiota.data.source.test.txt')  # test
-    # data = MushroomData('data/mushroom/' + MushroomData.default_file_name)
 
-    # Class Distribution:
-    # --    edible: 4208(51.8 %)
-    # -- poisonous: 3916(48.2 %)
-    # --     total: 8124 instances
-    x, y = data.get_basic_data()
-
-    # spit with cv fold = 5
-    cv_fold_number = 5
-
-    # cumulative results
     result_file_name = 'mushroom_experiment.out'
-    ssl_mincut_knn_result = copy.deepcopy(classification_report_form)
-    ssl_graphical_mst_result = copy.deepcopy(classification_report_form)
-    ssl_mincut_mst_result = copy.deepcopy(classification_report_form)
-    ssl_mincut_knn_mst_result = copy.deepcopy(classification_report_form)
-    ssl_graphical_knn_mst_result = copy.deepcopy(classification_report_form)
+    data_processor = MushroomData(file_dir)
 
-    # split labeled and unlabeled set
-    sss_data = StratifiedShuffleSplit(n_splits=cv_fold_number, test_size=unlabeled_size, random_state=0)
-    for train_index, test_index in sss_data.split(x, y):
-        # convert data to scalar after getting train
-        # THIS mus be processing only on train data
-        # and apply same setting for test data
-        x_l, x_u = data.get_scalar_data(train_index, test_index)
-        y_l = y[train_index]
-        y_u = y[test_index]
-
-        # (method 1) SSL mincut using KNN graph
-        knn_paras = copy.deepcopy(knn_parameters_form)
-        knn_paras['start'] = 1
-        knn_paras['stop'] = 15
-        knn_paras['step'] = 1
-        y_u_predict_mincut_knn = ssl_mincut_knn(x_l, y_l, x_u, knn_paras)
-
-        # (method 2 & 3)
-        # SSL graphical model and mincut using minimum spanning tree graph
-        # 2 methods may use 2 different trees
-        y_u_predict_mincut_mst = ssl_mincut_mst(x_l, y_l, x_u)
-        y_u_predict_graphical_mst = ssl_graphical_mst(x_l, y_l, x_u)
-
-        # (method 4 & 5)
-        # SSL graphical model and mincut using minimum spanning trees on KNN graph's components
-        y_u_predict_mincut_knn_mst = ssl_mincut_knn_mst(x_l, y_l, x_u, knn_paras)
-        y_u_predict_graphical_knn_mst = ssl_graphical_knn_mst(x_l, y_l, x_u, knn_paras)
-
-        ssl_mincut_knn_result = sum_classification_report(
-            ssl_mincut_knn_result,
-            classification_report(y_u, y_u_predict_mincut_knn, output_dict=True))
-        ssl_graphical_mst_result = sum_classification_report(
-            ssl_graphical_mst_result,
-            classification_report(y_u, y_u_predict_graphical_mst, output_dict=True))
-        ssl_mincut_mst_result = sum_classification_report(
-            ssl_mincut_mst_result,
-            classification_report(y_u, y_u_predict_mincut_mst, output_dict=True))
-        ssl_mincut_knn_mst_result = sum_classification_report(
-            ssl_mincut_knn_mst_result,
-            classification_report(y_u, y_u_predict_mincut_knn_mst, output_dict=True))
-        ssl_graphical_knn_mst_result = sum_classification_report(
-            ssl_graphical_knn_mst_result,
-            classification_report(y_u, y_u_predict_graphical_knn_mst, output_dict=True))
-
-        # export result
-    export_cumulative_result(result_file_name, "ssl_mincut_knn_result",
-                             ssl_mincut_knn_result, cumul_scale=cv_fold_number)
-    export_cumulative_result(result_file_name, "ssl_graphical_mst_result",
-                             ssl_graphical_mst_result, cumul_scale=cv_fold_number)
-    export_cumulative_result(result_file_name, "ssl_mincut_mst_result",
-                             ssl_mincut_mst_result, cumul_scale=cv_fold_number)
-    export_cumulative_result(result_file_name, "ssl_mincut_knn_mst_result",
-                             ssl_mincut_knn_mst_result, cumul_scale=cv_fold_number)
-    export_cumulative_result(result_file_name, "ssl_graphical_knn_mst_result",
-                             ssl_graphical_knn_mst_result, cumul_scale=cv_fold_number)
+    exp = Experiment(data_processor, result_file_name)
+    exp.process_ssl(unlabeled_size=unlabeled_size)
 
 
-def anuran_experiment(unlabeled_size=0.5):
+def anuran_experiment(file_dir, unlabeled_size=0.5):
     """
-    Experiment using Anuran calls dataset, only binary on Family=Leptodactylidae
+    Experiment on Anuran Calls (MFCCs) data, binary classifier
+    with positive label Family=Leptodactylidae
+    :param file_dir: data file location
+    :param unlabeled_size: size of unlabeled data
+    :return: result export to file result_file_name
     """
-    logging.info('Start Experiment Anuran Calls (MFCCs) Data')
-    data = AnuranCallData('data/anuran_calls/Frogs_MFCCs.source.test.csv')  # test
-    # data = AnuranCallData('data/anuran_calls/' + AnuranCallData.default_file_name)
+    logging.info('Start Anuran Experiment')
 
-    # Class distribution(training set)
-    # #instances 7195
-    # #features 22
-
-    x, y = data.get_binary_class_data()
-
-    # spit with cv fold = 5
-    cv_fold_number = 5
-
-    # cumulative results
     result_file_name = 'anuran_experiment.out'
-    ssl_mincut_knn_result = copy.deepcopy(classification_report_form)
-    ssl_graphical_mst_result = copy.deepcopy(classification_report_form)
-    ssl_mincut_mst_result = copy.deepcopy(classification_report_form)
-    ssl_mincut_knn_mst_result = copy.deepcopy(classification_report_form)
-    ssl_graphical_knn_mst_result = copy.deepcopy(classification_report_form)
+    data_processor = AnuranCallData(file_dir)
 
-    # split labeled and unlabeled set
-    sss_data = StratifiedShuffleSplit(n_splits=cv_fold_number, test_size=unlabeled_size, random_state=0)
-    for train_index, test_index in sss_data.split(x, y):
-        x_l = x[train_index]
-        y_l = y[train_index]
-        x_u = x[test_index]
-        y_u = y[test_index]
-
-        # (method 1) SSL mincut using KNN graph
-        knn_paras = copy.deepcopy(knn_parameters_form)
-        knn_paras['start'] = 1
-        knn_paras['stop'] = 15
-        knn_paras['step'] = 1
-        y_u_predict_mincut_knn = ssl_mincut_knn(x_l, y_l, x_u, knn_paras)
-
-        # (method 2 & 3)
-        # SSL graphical model and mincut using minimum spanning tree graph
-        # 2 methods may use 2 different trees
-        y_u_predict_mincut_mst = ssl_mincut_mst(x_l, y_l, x_u)
-        y_u_predict_graphical_mst = ssl_graphical_mst(x_l, y_l, x_u)
-
-        # (method 4 & 5)
-        # SSL graphical model and mincut using minimum spanning trees on KNN graph's components
-        y_u_predict_mincut_knn_mst = ssl_mincut_knn_mst(x_l, y_l, x_u, knn_paras)
-        y_u_predict_graphical_knn_mst = ssl_graphical_knn_mst(x_l, y_l, x_u, knn_paras)
-
-        ssl_mincut_knn_result = sum_classification_report(
-            ssl_mincut_knn_result,
-            classification_report(y_u, y_u_predict_mincut_knn, output_dict=True))
-        ssl_graphical_mst_result = sum_classification_report(
-            ssl_graphical_mst_result,
-            classification_report(y_u, y_u_predict_graphical_mst, output_dict=True))
-        ssl_mincut_mst_result = sum_classification_report(
-            ssl_mincut_mst_result,
-            classification_report(y_u, y_u_predict_mincut_mst, output_dict=True))
-        ssl_mincut_knn_mst_result = sum_classification_report(
-            ssl_mincut_knn_mst_result,
-            classification_report(y_u, y_u_predict_mincut_knn_mst, output_dict=True))
-        ssl_graphical_knn_mst_result = sum_classification_report(
-            ssl_graphical_knn_mst_result,
-            classification_report(y_u, y_u_predict_graphical_knn_mst, output_dict=True))
-
-        # export result
-    export_cumulative_result(result_file_name, "ssl_mincut_knn_result",
-                             ssl_mincut_knn_result, cumul_scale=cv_fold_number)
-    export_cumulative_result(result_file_name, "ssl_graphical_mst_result",
-                             ssl_graphical_mst_result, cumul_scale=cv_fold_number)
-    export_cumulative_result(result_file_name, "ssl_mincut_mst_result",
-                             ssl_mincut_mst_result, cumul_scale=cv_fold_number)
-    export_cumulative_result(result_file_name, "ssl_mincut_knn_mst_result",
-                             ssl_mincut_knn_mst_result, cumul_scale=cv_fold_number)
-    export_cumulative_result(result_file_name, "ssl_graphical_knn_mst_result",
-                             ssl_graphical_knn_mst_result, cumul_scale=cv_fold_number)
+    exp = Experiment(data_processor, result_file_name)
+    exp.process_ssl(unlabeled_size=unlabeled_size)
 
 
+def newsgroups_experiment(folder_dir, unlabeled_size=0.5, categories=None, positive_labels=None,
+                          feature_score=None, feature_number=600, normalize=None, **kwargs_normalize):
+    """
+    Experiment on 20Newsgroup data, binary classifier
+
+    Class names
+    'alt.atheism',
+    'comp.graphics',
+    'comp.os.ms-windows.misc',
+    'comp.sys.ibm.pc.hardware',
+    'comp.sys.mac.hardware',
+    'comp.windows.x',
+    'misc.forsale',
+    'rec.autos',
+    'rec.motorcycles',
+    'rec.sport.baseball',
+    'rec.sport.hockey',
+    'sci.crypt',
+    'sci.electronics',
+    'sci.med',
+    'sci.space',
+    'soc.religion.christian',
+    'talk.politics.guns',
+    'talk.politics.mideast',
+    'talk.politics.misc',
+    'talk.religion.misc'
+    :param folder_dir: data folder
+    :param unlabeled_size: size of unlabeled data
+    :param categories: picked categorizes
+    :param positive_labels: categorizes that will be used for positive label
+    :param feature_score: word scoring method for reducing feature
+    :param feature_number: number of feature used (select from top words with high scrore)
+    :param normalize: data normalize method (after feature reducing)
+    :return:
+    """
+    logging.info('Start 20Newsgroup Experiment')
+
+    result_file_name = 'newsgroups_experiment.out'
+    data_processor = NewsgroupsData(
+        folder_dir=folder_dir, categories=categories, positive_labels=positive_labels,
+        feature_score=feature_score, feature_number=feature_number,
+        normalize=normalize, **kwargs_normalize)
+
+    exp = Experiment(data_processor, result_file_name)
+    exp.process_ssl(unlabeled_size=unlabeled_size)
+
+
+###############################################################################
 def main():
     logging.info('Start main()')
     try:
-        # abalone_experiment(positive_rings=[5, 6, 7, 8, 9], unlabeled_size=0.5)
-        # mushroom_experiment(unlabeled_size=0.5)
-        anuran_experiment(unlabeled_size=0.5)
+        abalone_experiment(
+            file_dir=data_dir['abalone'],
+            positive_rings=[5, 6, 7, 8, 9],
+            unlabeled_size=0.7)
+
+        anuran_experiment(file_dir=data_dir['anuran'], unlabeled_size=0.7)
+
+        mushroom_experiment(file_dir=data_dir['mushroom'], unlabeled_size=0.7)
+
+        newsgroups_experiment(
+            folder_dir=data_dir['20news'], unlabeled_size=0.7,
+            categories=[
+                'comp.graphics', 'comp.os.ms-windows.misc',
+                'comp.sys.ibm.pc.hardware', 'comp.sys.mac.hardware', 'comp.windows.x',
+
+                'rec.autos', 'rec.motorcycles', 'rec.sport.baseball','rec.sport.hockey',
+                ],
+            positive_labels=[
+                'rec.autos', 'rec.motorcycles', 'rec.sport.baseball', 'rec.sport.hockey',
+            ],
+            feature_score='tfidf', feature_number=600,
+            normalize='tfidf', scale = 10000.
+        )
     except BaseException:
-        logging.exception('Main eception')
+        logging.exception('Main exception')
         raise
 
 
