@@ -20,6 +20,7 @@ from data.newsgroups_processing import NewsgroupsData
 from graph_construction import GraphConstruction
 from mincut_inference import MincutInference
 from graphical_model_inference import GraphicalModelWithTree
+from graphical_model_inference import GraphicalModelWithLoop
 from utility import ResultExporter, ParamSearch
 
 
@@ -65,7 +66,8 @@ class GraphInference(BaseEstimator, ClassifierMixin):
     def __init__(self, model_type='mincut'):
         self.model_map = {
             'mincut': MincutInference,
-            'graphical_tree': GraphicalModelWithTree
+            'graphical_tree': GraphicalModelWithTree,
+            'graphical_loop': GraphicalModelWithLoop
         }
         self.model_type = model_type
 
@@ -108,8 +110,15 @@ class Experiment():
             'infer__model_type': ['graphical_tree'],
             'trans__metric': ['euclidean', 'rbf', 'cosine'],
             'trans__graph_type': ['mst', 'knn_mst']}
+        self.graphical_loop_param = {
+            'infer__model_type': ['graphical_loop'],
+            'trans__metric': ['euclidean', 'rbf', 'cosine'],
+            'trans__graph_type': ['knn', 'mst', 'knn_mst']}
 
-        self.param_grid = ParameterGrid([self.mincut_param, self.graphical_tree_param])
+        self.param_grid = ParameterGrid([
+            self.mincut_param,
+            self.graphical_tree_param,
+            self.graphical_loop_param])
 
         # setup pipeline
         self.experiment_pipeline = Pipeline([
