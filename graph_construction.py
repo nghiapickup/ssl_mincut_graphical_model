@@ -8,8 +8,10 @@
 import logging
 
 import numpy as np
-from igraph import Graph
-from scipy.spatial.distance import cosine
+import igraph
+from sklearn.metrics.pairwise import euclidean_distances
+from sklearn.metrics.pairwise import cosine_similarity
+from sklearn.metrics.pairwise import rbf_kernel
 
 
 class GraphConstruction:
@@ -29,19 +31,27 @@ class GraphConstruction:
         self._labeled_data_number = len(x_l)
         self._x_u_number = len(x_u)
 
-        # init fully connected graph
-        # labeled data indexes from 0..|x_l|-1, unlabeled data from |x_l|..|_x|-1
-        self._graph = Graph.Full(len(self._x))
-        self._graph.es['weight'] = 0
-        self._graph.vs['label'] = self._y  # label vertices
-
         # init weight with input metric
         self._metric_map = {
             'euclidean': self._euclidean_similarity,
-            'rbf': self._rbf_kernel,
+            'gaussian': self._gaussian_kernel,
             'cosine': self._cosine_similarity
         }
-        self.re_weight_graph(metric, metric_param)
+        try:
+            weight_matrix = self._metric_map[metric](metric_param)
+        except KeyError:
+            logging.error('GraphConstruction: None supported metric %s.' % metric)
+            raise
+
+        # init fully connected graph from adjacency matrix
+        # labeled data indexes from 0..|x_l|-1, unlabeled data from |x_l|..|_x|-1
+        weight_matrix = np.triu(weight_matrix)
+        self._graph = igraph.Graph.Adjacency(
+            (weight_matrix > 0).tolist(),
+            mode=igraph.ADJ_UNDIRECTED
+        )
+        self._graph.es['weight'] = weight_matrix[weight_matrix.nonzero()]
+        self._graph.vs['label'] = self._y  # label vertices
 
         self._construction_map ={
             'knn': self._construct_knn_graph,
@@ -70,29 +80,27 @@ class GraphConstruction:
         Constrain W[i,i] = 0
         :return:
         """
-        # TODO matrix calc here
-        for i in range(len(self._x)):
-            for j in range(i+1, len(self._x)):
-                self._graph[i, j] = 1/(1 + np.linalg.norm(self._x[i] - self._x[j]))
-                self._graph[j, i] = self._graph[i, j]
+        weight_matrix = euclidean_distances(self._x)
+        weight_matrix = 1/(1 + weight_matrix)
+        np.fill_diagonal(weight_matrix, 0)
 
-    def _rbf_kernel(self, metric_param=None):
+        return weight_matrix
+
+    def _gaussian_kernel(self, metric_param=None):
         """
-        Calc RBF kernel
+        Calc gaussian kernel
         Constrain W[i,i] = 0
-        The default bandwidth(None input) is 1/#feature
+        The default bandwidth(None input) is #feature
         :param bandwidth: bandwidth parameter
         :return:
         """
         bandwidth = metric_param
         if bandwidth is None:
-            bandwidth = 1/self._x.shape[1]
+            bandwidth = 1 / (self._x.shape[1]**2)
+        weight_matrix = rbf_kernel(self._x, gamma=bandwidth)
+        np.fill_diagonal(weight_matrix, 0)
 
-        # xxx igraph, i want to set by adj matrix
-        for i in range(len(self._x)):
-            for j in range(i + 1, len(self._x)):
-                self._graph[i, j] = np.exp(-np.linalg.norm(self._x[i] - self._x[j])**2 / (bandwidth**2))
-                self._graph[j, i] = self._graph[i, j]
+        return weight_matrix
 
     def _cosine_similarity(self, metric_param=None):
         """
@@ -100,23 +108,10 @@ class GraphConstruction:
         Constrain W[i,i] = 0
         :return:
         """
-        for i in range(len(self._x)):
-            for j in range(i + 1, len(self._x)):
-                self._graph[i, j] = 1 - cosine(self._x[i], self._x[j])
-                self._graph[j, i] = self._graph[i, j]
+        weight_matrix = cosine_similarity(self._x)
+        np.fill_diagonal(weight_matrix, 0)
 
-    def re_weight_graph(self, metric='euclidean', metric_param=None):
-        """
-        re-weighting graph
-        :param metric: new metric calculator
-        :param metric_param: metric's parameter
-        :return:
-        """
-        try:
-            self._metric_map[metric](metric_param)
-        except KeyError:
-            logging.error('GraphConstruction: None supported metric %s.' % metric)
-            raise
+        return weight_matrix
 
     def _construct_knn_graph(self, k=3):
         """
