@@ -18,11 +18,12 @@ class TestGraphConstruction(unittest.TestCase):
     # x = (1,1),(2,3),(3,5),(4,0),(1,0)
 
     def setUp(self):
-        self.euclidean_distance_matrix = np.array([[0, np.sqrt(1 + 4), np.sqrt(4 + 16), np.sqrt(9 + 1), np.sqrt(0 + 1)],
-                                                  [np.sqrt(1 + 4), 0, np.sqrt(1 + 4), np.sqrt(4 + 9), np.sqrt(1 + 9)],
-                                                  [np.sqrt(4 + 16), np.sqrt(1 + 4), 0, np.sqrt(1 + 25), np.sqrt(4 + 25)],
-                                                  [np.sqrt(9 + 1), np.sqrt(4 + 9), np.sqrt(1 + 25), 0, np.sqrt(9 + 0)],
-                                                  [np.sqrt(0 + 1), np.sqrt(1 + 9), np.sqrt(4 + 25), np.sqrt(9 + 0), 0]])
+        self.euclidean_distance_matrix = np.array(
+            [[0, np.sqrt(1 + 4), np.sqrt(4 + 16), np.sqrt(9 + 1), np.sqrt(0 + 1)],
+             [np.sqrt(1 + 4), 0, np.sqrt(1 + 4), np.sqrt(4 + 9), np.sqrt(1 + 9)],
+             [np.sqrt(4 + 16), np.sqrt(1 + 4), 0, np.sqrt(1 + 25), np.sqrt(4 + 25)],
+             [np.sqrt(9 + 1), np.sqrt(4 + 9), np.sqrt(1 + 25), 0, np.sqrt(9 + 0)],
+             [np.sqrt(0 + 1), np.sqrt(1 + 9), np.sqrt(4 + 25), np.sqrt(9 + 0), 0]])
         # squared Euclidean
         #  0,  5, 20, 10,  1
         #  5,  0,  5, 13, 10
@@ -68,11 +69,12 @@ class TestGraphConstruction(unittest.TestCase):
         # 20,  5,  0, 26, 29
         # 10, 13, 26,  0,  9
         #  1, 10, 29,  9,  0
-        expected_adj_matrix = np.array([[0, 1, 1, 1, 1],
-                                        [1, 0, 1, 0, 0],
-                                        [1, 1, 0, 0, 0],
-                                        [1, 0, 0, 0, 1],
-                                        [1, 0, 0, 1, 0]])
+        expected_adj_matrix = np.array(
+            [[0, 1, 1, 1, 1],
+             [1, 0, 1, 0, 0],
+             [1, 1, 0, 0, 0],
+             [1, 0, 0, 0, 1],
+             [1, 0, 0, 1, 0]])
 
         graph_constructor = GraphConstruction(self.x_l, self.y_l, self.x_u)
         graph_constructor.construct_graph(graph_type='knn', k=2)
@@ -81,11 +83,12 @@ class TestGraphConstruction(unittest.TestCase):
         self.assertTrue(np.array_equal(expected_adj_matrix, adj_matrix))
 
     def test_construct_mst_graph(self):
-        expected_adj_matrix = np.array([[0, 1, 0, 0, 1],
-                                        [1, 0, 1, 0, 0],
-                                        [0, 1, 0, 0, 0],
-                                        [0, 0, 0, 0, 1],
-                                        [1, 0, 0, 1, 0]])
+        expected_adj_matrix = np.array(
+            [[0, 1, 0, 0, 1],
+             [1, 0, 1, 0, 0],
+             [0, 1, 0, 0, 0],
+             [0, 0, 0, 0, 1],
+             [1, 0, 0, 1, 0]])
 
         graph_constructor = GraphConstruction(self.x_l, self.y_l, self.x_u)
         graph_constructor.construct_graph(graph_type='mst')

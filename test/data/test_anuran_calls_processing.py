@@ -1,9 +1,12 @@
 import unittest
+
+from source import data_dir
 from data.anuran_calls_processing import AnuranCallData
+
 
 class TestAnuranCallData(unittest.TestCase):
     def setUp(self):
-        self.data = AnuranCallData('../../data/anuran_calls/Frogs_MFCCs.csv')
+        self.data = AnuranCallData('../../' + data_dir['anuran'])
         self.data.transform()
 
     def test_init(self):

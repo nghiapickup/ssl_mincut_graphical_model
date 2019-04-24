@@ -24,8 +24,7 @@ class MushroomData(BaseDataProcessor):
     poisonous:  3916 (48.2 %)
     total:      8124 instances
     """
-    default_filename = 'agaricus-lepiota.data.txt'
-    test_filename = 'agaricus-lepiota.data.source.test.txt'
+    default_file_dir = 'mushroom/agaricus-lepiota.data.txt'
     data_header = ['class', 'cap-shape', 'cap-surface', 'cap-color', 'bruises?', 'odor',
               'gill-attachment', 'gill-spacing', 'gill-size', 'gill-color',
               'stalk-shape', 'stalk-root', 'stalk-surface-above-ring',
@@ -36,13 +35,14 @@ class MushroomData(BaseDataProcessor):
     def __init__(self, file_dir):
         logging.info('MushroomData __init__')
 
-        self._mushroom_df = pd.read_csv(file_dir, names = self.data_header)
+        BaseDataProcessor.__init__(self)
+
+        self._mushroom_df = pd.read_csv(file_dir, names=self.data_header)
         # Map classes feature
-        self._mushroom_df['class'] = self._mushroom_df['class'].map({'p':0, 'e':1})
+        self._mushroom_df['class'] = self._mushroom_df['class'].map({'p': 0, 'e': 1})
         # Drop one value and missing features (missing rate > 1/4)
         self._mushroom_df = self._mushroom_df.drop(columns=['veil-type', 'stalk-root'])
 
-        BaseDataProcessor.__init__(self)
         self._x_number = len(self._mushroom_df.index)
 
     def transform(self):

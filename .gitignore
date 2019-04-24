@@ -1,1 +1,7 @@
 lib
+data/reuters/data
+data/abalone/abalone.names.txt
+data/abalone/Index.txt
+data/mushroom/agaricus-lepiota.names.txt
+data/mushroom/expanded
+data/mushroom/Index.txt

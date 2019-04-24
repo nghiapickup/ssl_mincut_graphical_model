@@ -5,6 +5,7 @@
 """
 
 import logging
+
 import pandas as pd
 from data.base_processing import BaseDataProcessor
 
@@ -28,21 +29,21 @@ class AbaloneData(BaseDataProcessor):
     14	126
     15	103
     """
-    default_filename = 'abalone.data.txt'
-    test_filename = 'abalone.data.source.test.txt'
+    default_file_dir = 'abalone/abalone.data.txt'
     data_header = ['Sex','Length','Diameter','Height','Whole weight',
                    'Shucked weight','Viscera weight','Shell weight','Rings']
 
     def __init__(self, file_dir, positive_labels=None):
         logging.info('AbaloneData __init__')
 
-        self._abalone_df = pd.read_csv(file_dir, names = self.data_header)
+        BaseDataProcessor.__init__(self)
+
+        self._abalone_df = pd.read_csv(file_dir, names=self.data_header)
         # 'Sex' feature
-        self._abalone_df['Sex'] = self._abalone_df['Sex'].map({'I':0, 'M':1, 'F':2})
+        self._abalone_df['Sex'] = self._abalone_df['Sex'].map({'I': 0, 'M': 1, 'F': 2})
         # Get only data with label range from [5:15]
         self._abalone_df = self._abalone_df[(self._abalone_df['Rings'] >= 5) & (self._abalone_df['Rings'] <= 15)]
 
-        BaseDataProcessor.__init__(self)
         self.positive_labels = positive_labels
         self._x_number = len(self._abalone_df.index)
 
