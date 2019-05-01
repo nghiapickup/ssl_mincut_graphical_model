@@ -76,7 +76,7 @@ class ParamSearch:
         logging.info('knn_graph_search')
 
         search_list = range(knn_param['start'], knn_param['stop']+1, knn_param['step'])
-        k_best = 0
+        k_best = knn_param['start']
         best_score = 0
         for k_search in search_list:
             sss_labeled = StratifiedShuffleSplit(n_splits=1, test_size=0.5, random_state=0)

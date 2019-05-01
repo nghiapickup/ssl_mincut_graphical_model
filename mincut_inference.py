@@ -51,7 +51,7 @@ class MincutInference:
         self._graph.delete_vertices([self._v_minus, self._v_plus])
         y = np.zeros(self._graph.vcount())  # re-construct y
         y[list(positive_label)] = 1
-        self._graph.vs['label'] = y
+        self._graph.vs['label'] = y.astype(int)
 
 
 class RandomizeMincutInference:

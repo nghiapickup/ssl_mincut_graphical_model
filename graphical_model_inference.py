@@ -30,7 +30,7 @@ class GraphicalModelInference:
         Calc factor function with given receiver
         :param receiver_label: label of receiver vertex
         :param weight: W[sender, receiver]
-        :param simplified: whether to omit exp calc (It's useful when having with ln outside)
+        :param simplified: whether to omit exp calc
         :return:
         """
         if simplified:
@@ -137,7 +137,17 @@ class GraphicalModelWithTree(GraphicalModelInference):
             if sender['label'] > -1:  # verify labeled
                 self._trace[sender.index, :] = sender['label']
             else:
-                self._trace[sender.index] = np.argmax(message, axis=1)
+                # when the messages are equal, use influence score - hard code
+                if message[0, 0] == message[0, 1]:
+                    self._trace[sender.index][0] = sender['influence']
+                else:
+                    self._trace[sender.index][0] = int(message[0, 1] > message[0, 0])
+
+                if message[1, 0] == message[1, 1]:
+                    self._trace[sender.index][1] = sender['influence']
+                else:
+                    self._trace[sender.index][1] = int(message[1, 1] > message[1, 0])
+
             # self._trace[sender.index].shape = (2,)
             self._messages[sender.index] = message[[0, 1], self._trace[sender.index]]
 
@@ -188,7 +198,8 @@ class GraphicalModelWithLoop(GraphicalModelInference):
         :return:
         """
         if threshold is None:
-            threshold = self._edges_num // 2
+            threshold = self._edges_num * 2
+            # threshold = self._edges_num // 2
 
         for _ in range(threshold+1):
             temp_message = np.zeros((self._edges_num, 2, 2))
@@ -208,7 +219,7 @@ class GraphicalModelWithLoop(GraphicalModelInference):
                         # connected_edge(source -> target) == source -> ne return 1
                         direction = int(self._graph.es[connected_edge_id].source == source)
                         neighbor_message_sum = \
-                            neighbor_message_sum + self._messages[connected_edge_id][direction]
+                            neighbor_message_sum + self._messages[connected_edge_id, direction]
 
                 # exp and log are annulled
                 # factor_message.shape = (2,2)
@@ -219,7 +230,7 @@ class GraphicalModelWithLoop(GraphicalModelInference):
                 # message.shape = (2,2)
                 message = factor_message + neighbor_message_sum
 
-                source_label = self._graph.vs[source]['label']
+                source_label = int(self._graph.vs[source]['label'])
                 if source_label > -1:  # verify labeled
                     temp_message[edge_id, 0] = message[:, source_label]
                 else:
@@ -236,7 +247,7 @@ class GraphicalModelWithLoop(GraphicalModelInference):
                         # connected_edge(source -> target) == target -> ne return 1
                         direction = int(self._graph.es[connected_edge_id].source == target)
                         neighbor_message_sum = \
-                            neighbor_message_sum + self._messages[connected_edge_id][direction]
+                            neighbor_message_sum + self._messages[connected_edge_id, direction]
 
                 # exp and log are annulled
                 # factor_message.shape = (2,2)
@@ -246,7 +257,7 @@ class GraphicalModelWithLoop(GraphicalModelInference):
                 # message = [factor_message[0] + neighbor_message_sum, factor_message[1] + neighbor_message_sum]
                 message = factor_message + neighbor_message_sum
 
-                target_label = self._graph.vs[target]['label']
+                target_label = int(self._graph.vs[target]['label'])
                 if target_label > -1:  # verify labeled
                     temp_message[edge_id, 1] = message[:, target_label]
                 else:
@@ -265,7 +276,10 @@ class GraphicalModelWithLoop(GraphicalModelInference):
                     # looking for the direction ne -> vertex
                     # connected_edge(source -> target) == ne -> vertex return 0
                     # connected_edge(source -> target) == vertex -> ne return 1
-                    direction = int(self._graph.es[connected_edge_id].source == vertex)
+                    direction = int(self._graph.es[connected_edge_id].source == vertex.index)
                     neighbor_message_sum = \
                         neighbor_message_sum + self._messages[connected_edge_id][direction]
-                vertex['label'] = np.argmax(neighbor_message_sum)
+                if neighbor_message_sum[0] == neighbor_message_sum[1]:
+                    vertex['label'] = vertex['influence']
+                else:
+                    vertex['label'] = np.argmax(neighbor_message_sum)

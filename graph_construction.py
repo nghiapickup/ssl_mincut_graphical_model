@@ -43,6 +43,13 @@ class GraphConstruction:
             logging.error('GraphConstruction: None supported metric %s.' % metric)
             raise
 
+        # calc influence of posive and negative group on unlabeled
+        # this is new for graphical model
+        influence = np.full(len(self._y), -1)
+        negative_influence = np.sum(weight_matrix[-self.x_u_number:, self._y == 0], axis=1)
+        positive_influence = np.sum(weight_matrix[-self.x_u_number:, self._y == 1], axis=1)
+        influence[-self.x_u_number:] = (positive_influence > negative_influence).astype(int)
+
         # init fully connected graph from adjacency matrix
         # labeled data indexes from 0..|x_l|-1, unlabeled data from |x_l|..|_x|-1
         weight_matrix = np.triu(weight_matrix)
@@ -52,6 +59,7 @@ class GraphConstruction:
         )
         self._graph.es['weight'] = weight_matrix[weight_matrix.nonzero()]
         self._graph.vs['label'] = self._y  # label vertices
+        self._graph.vs['influence'] = influence
 
         self._construction_map ={
             'knn': self._construct_knn_graph,

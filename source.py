@@ -185,6 +185,11 @@ class ExperimentSetUp:
                 + '_'
                 + param_set['trans__graph_type'])
             )
+        # add sl only experiments
+        sl_result = []
+        sl_model_names = self.sl_models.keys()
+        for sl_name in sl_model_names:
+            sl_result.append(ResultExporter(sl_name))
 
         # split labeled and unlabeled set
         sss_data = StratifiedShuffleSplit(n_splits=self.cv_fold_number,
@@ -194,6 +199,16 @@ class ExperimentSetUp:
                                                       self.data_processor.y):
             x_l, y_l, x_u, y_u = self.data_processor.extract(train_index, test_index)
 
+            # sl experiments
+            for test_id, sl_name in enumerate(sl_model_names):
+                sl_model = self.sl_models.get(sl_name)
+                sl_model.fit(x_l, y_l)
+
+                # sum score on y_test
+                report = classification_report(y_u, sl_model.predict(x_u), output_dict=True)
+                sl_result[test_id].sum_report(report)
+
+            # ssl experiment
             for test_id, param_set in enumerate(self.ssl_param_grid):
 
                 # set basic params first
@@ -218,6 +233,8 @@ class ExperimentSetUp:
         # export result
         for test_case in result:
             test_case.export(self.result_filename, scale=self.cv_fold_number)
+        for test_case in sl_result:
+            test_case.export(self.result_filename, scale=self.cv_fold_number)
 
     def process_sl(self, test_size=0.3, unlabeled_size=0.7):
 
@@ -225,6 +242,7 @@ class ExperimentSetUp:
         result = {}
         sl_model_names = self.sl_models.keys()
 
+        # add graph-based + sl experiments
         for param_set in self.ssl_param_grid:
             ssl_name = param_set['infer__model_type'] \
                        + '_' \
@@ -234,6 +252,9 @@ class ExperimentSetUp:
             for sl_name in sl_model_names:
                 model_name = sl_name + '_' + ssl_name
                 result[model_name] = ResultExporter(model_name)
+        # add sl only experiments
+        for sl_name in sl_model_names:
+            result[sl_name] = ResultExporter(sl_name)
 
         # split labeled and unlabeled set
         sl_sss_data = StratifiedShuffleSplit(n_splits=self.cv_fold_number,
@@ -251,6 +272,16 @@ class ExperimentSetUp:
                 x_u, _ = x_train[unlabeled_index], y_train[unlabeled_index]
                 y_train_predict = copy.deepcopy(y_train)
 
+                # sl experiments
+                for sl_name in sl_model_names:
+                    sl_model = self.sl_models.get(sl_name)
+                    sl_model.fit(x_l, y_l)
+
+                    # sum score on y_test
+                    report = classification_report(y_test, sl_model.predict(x_test), output_dict=True)
+                    result[sl_name].sum_report(report)
+
+                # ssl experiment
                 for param_set in self.ssl_param_grid:
 
                     # set basic params first

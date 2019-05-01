@@ -18,12 +18,13 @@ class TestGraphConstruction(unittest.TestCase):
     # x = (1,1),(2,3),(3,5),(4,0),(1,0)
 
     def setUp(self):
-        self.euclidean_distance_matrix = np.array(
-            [[0, np.sqrt(1 + 4), np.sqrt(4 + 16), np.sqrt(9 + 1), np.sqrt(0 + 1)],
-             [np.sqrt(1 + 4), 0, np.sqrt(1 + 4), np.sqrt(4 + 9), np.sqrt(1 + 9)],
-             [np.sqrt(4 + 16), np.sqrt(1 + 4), 0, np.sqrt(1 + 25), np.sqrt(4 + 25)],
-             [np.sqrt(9 + 1), np.sqrt(4 + 9), np.sqrt(1 + 25), 0, np.sqrt(9 + 0)],
-             [np.sqrt(0 + 1), np.sqrt(1 + 9), np.sqrt(4 + 25), np.sqrt(9 + 0), 0]])
+        self.euclidean_distance_matrix = np.array([
+            [0, np.sqrt(1 + 4), np.sqrt(4 + 16), np.sqrt(9 + 1), np.sqrt(0 + 1)],
+            [np.sqrt(1 + 4), 0, np.sqrt(1 + 4), np.sqrt(4 + 9), np.sqrt(1 + 9)],
+            [np.sqrt(4 + 16), np.sqrt(1 + 4), 0, np.sqrt(1 + 25), np.sqrt(4 + 25)],
+            [np.sqrt(9 + 1), np.sqrt(4 + 9), np.sqrt(1 + 25), 0, np.sqrt(9 + 0)],
+            [np.sqrt(0 + 1), np.sqrt(1 + 9), np.sqrt(4 + 25), np.sqrt(9 + 0), 0]]
+        )
         # squared Euclidean
         #  0,  5, 20, 10,  1
         #  5,  0,  5, 13, 10
