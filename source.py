@@ -33,8 +33,9 @@ from utility import ResultExporter, ParamSearch
 LOG_FILE = 'source.log'
 
 logFormatter = logging.Formatter(
-    "%(asctime)s [%(threadName)-12.12s] "
-    "[%(levelname)-5.5s]  %(message)s")
+    '%(asctime)s [%(threadName)-12.12s] '
+    '[%(levelname)-5.5s]  %(message)s'
+)
 rootLogger = logging.getLogger()
 rootLogger.setLevel(logging.DEBUG)
 
@@ -178,13 +179,11 @@ class ExperimentSetUp:
         # cumulative results
         result = []
         for param_set in self.ssl_param_grid:
-            result.append(ResultExporter(
-                param_set['infer__model_type']
-                + '_'
-                + param_set['trans__metric']
-                + '_'
-                + param_set['trans__graph_type'])
-            )
+            result.append(ResultExporter('{}_{}_{}'.format(
+                param_set['infer__model_type'],
+                param_set['trans__metric'],
+                param_set['trans__graph_type']
+            )))
         # add sl only experiments
         sl_result = []
         sl_model_names = self.sl_models.keys()
@@ -244,11 +243,11 @@ class ExperimentSetUp:
 
         # add graph-based + sl experiments
         for param_set in self.ssl_param_grid:
-            ssl_name = param_set['infer__model_type'] \
-                       + '_' \
-                       + param_set['trans__metric'] \
-                       + '_' \
-                       + param_set['trans__graph_type']
+            ssl_name = '{}_{}_{}'.format(
+                param_set['infer__model_type'],
+                param_set['trans__metric'],
+                param_set['trans__graph_type']
+            )
             for sl_name in sl_model_names:
                 model_name = sl_name + '_' + ssl_name
                 result[model_name] = ResultExporter(model_name)
@@ -301,11 +300,11 @@ class ExperimentSetUp:
                         [x_l, x_u], y_l, trans__k=k).predict(None)
 
                     # use the predicted unlabeled data to train test data
-                    ssl_name = param_set['infer__model_type'] \
-                               + '_' \
-                               + param_set['trans__metric'] \
-                               + '_' \
-                               + param_set['trans__graph_type']
+                    ssl_name = '{}_{}_{}'.format(
+                        param_set['infer__model_type'],
+                        param_set['trans__metric'],
+                        param_set['trans__graph_type']
+                    )
                     y_train_predict[unlabeled_index] = y_u_predict
 
                     for sl_name in sl_model_names:
@@ -550,8 +549,8 @@ def main():
     except BaseException:
         logging.exception('Main exception')
         raise
-    finally:
-        return 'Done main()'
+
+    return 'Done main()'
 
 
 if __name__ == '__main__':

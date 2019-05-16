@@ -33,16 +33,13 @@ class GraphicalModelInference:
         :param simplified: whether to omit exp calc
         :return:
         """
-        if simplified:
-            message = np.array([
-                -weight * (-1 - receiver_label) ** 2,
-                -weight * (+1 - receiver_label) ** 2
-            ])
-        else:
-            message = np.exp(np.array([
-                -weight * (-1 - receiver_label) ** 2,
-                -weight * (+1 - receiver_label) ** 2
-            ]))
+        message = np.array([
+            -weight * (-1 - receiver_label) ** 2,
+            -weight * (+1 - receiver_label) ** 2
+        ])
+        if not simplified:
+            message = np.log(message)
+
         # return shape = (2,)
         return message
 

@@ -52,12 +52,15 @@ class ResultExporter:
             if message is not None:
                 f.writelines('\n' + message)
             f.writelines('\n' + self.name + '\n')
-            f.write("\n%15s%10s%10s%10s%10s\n" %
-                    ("", "precision", "recall", "f1-score", "support"))
+            f.write('\n{:>15}{:>10}{:>10}{:>10}{:>10}\n'.format(
+                '', 'precision', 'recall', 'f1-score', 'support'
+            ))
             for att in self.report:
-                f.write("%15s" % att)
+                f.write('{:>15}'.format(att))
                 for val in self.report[att]:
-                    f.write("%10.2f" % round(self.report[att][val] / scale, 2))
+                    f.write('{:10.2f}'.format(
+                        round(self.report[att][val] / scale, 2)
+                    ))
                 f.write('\n')
 
 
