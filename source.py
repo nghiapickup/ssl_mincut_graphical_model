@@ -339,7 +339,7 @@ class Experiment:
             'mushroom': {'file_dir': data_dir['mushroom']},
             'abalone': {
                 'file_dir': data_dir['abalone'],
-                'positive_rings': [5, 6, 7, 8, 9]
+                'positive_labels': [5, 6, 7, 8, 9]
             },
             'newsgroups': {
                 'folder_dir': data_dir['20news'],
@@ -350,6 +350,38 @@ class Experiment:
                 ],
                 'positive_labels': [
                     'rec.autos', 'rec.motorcycles', 'rec.sport.baseball', 'rec.sport.hockey'
+                ],
+                'feature_score': 'tfidf',
+                'feature_number': 400,
+                'normalize': 'tfidf',
+                'scale': 10000.
+            },
+            'newsgroups2': {
+                'folder_dir': data_dir['20news'],
+                'categories': [
+                    'comp.graphics', 'comp.os.ms-windows.misc',
+                    'comp.sys.ibm.pc.hardware', 'comp.sys.mac.hardware', 'comp.windows.x',
+                    'sci.crypt', 'sci.electronics', 'sci.med', 'sci.space'
+                ],
+                'positive_labels': [
+                    'sci.crypt', 'sci.electronics', 'sci.med', 'sci.space'
+                ],
+                'feature_score': 'tfidf',
+                'feature_number': 400,
+                'normalize': 'tfidf',
+                'scale': 10000.
+            },
+            'newsgroups3': {
+                'folder_dir': data_dir['20news'],
+                'categories': [
+                    'comp.graphics', 'comp.os.ms-windows.misc',
+                    'comp.sys.ibm.pc.hardware', 'comp.sys.mac.hardware', 'comp.windows.x',
+                    'talk.politics.guns', 'talk.politics.mideast',
+                    'talk.politics.misc', 'talk.religion.misc'
+                ],
+                'positive_labels': [
+                    'talk.politics.guns', 'talk.politics.mideast',
+                    'talk.politics.misc', 'talk.religion.misc'
                 ],
                 'feature_score': 'tfidf',
                 'feature_number': 400,
@@ -367,15 +399,17 @@ class Experiment:
             }
         }
 
-    def get_experiment(self, exp_name):
+    def get_experiment(self, exp_name, paras_name=None):
         try:
-            return self.experiments_map[exp_name](**self.params_map[exp_name])
+            if not paras_name:
+                paras_name=exp_name
+            return self.experiments_map[exp_name](**self.params_map[paras_name])
         except KeyError:
             logging.error('Experiment: Non recognized experiment %s.' % exp_name)
             raise
 
     @staticmethod
-    def abalone_experiment(file_dir, positive_rings):
+    def abalone_experiment(file_dir, positive_labels):
         """
         Experiment on Abalone data, binary classifier
 
@@ -399,7 +433,7 @@ class Experiment:
         logging.info('Start Abalone Experiment')
 
         result_file_name = 'abalone_experiment.out'
-        data_processor = AbaloneData(file_dir, positive_labels=positive_rings)
+        data_processor = AbaloneData(file_dir, positive_labels=positive_labels)
         exp = ExperimentSetUp(data_processor, result_file_name)
 
         return exp
@@ -536,15 +570,15 @@ def main():
     try:
         exp = Experiment()
 
-        exp1 = exp.get_experiment('abalone')
-        # exp1 = exp.get_experiment('anuran')
-        # exp1 = exp.get_experiment('digit')
-        # exp1 = exp.get_experiment('mushroom')
-        # exp1 = exp.get_experiment('reuters')
-        # exp1 = exp.get_experiment('newsgroups')
+        exp = exp.get_experiment('abalone')
+        # exp = exp.get_experiment('anuran')
+        # exp = exp.get_experiment('digit')
+        # exp = exp.get_experiment('mushroom')
+        # exp = exp.get_experiment('reuters')
+        # exp = exp.get_experiment('newsgroups', 'newsgroups1')
 
-        exp1.process_ssl(unlabeled_size=0.7)
-        exp1.process_sl(test_size=0.3, unlabeled_size=0.7)
+        exp.process_ssl(unlabeled_size=0.7)
+        exp.process_sl(test_size=0.3, unlabeled_size=0.7)
 
     except BaseException:
         logging.exception('Main exception')
