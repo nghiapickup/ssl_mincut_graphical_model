@@ -1,4 +1,4 @@
-numpy==1.16.3
+numpy==1.22.0
 pandas==0.24.2
 python-igraph==0.7.1.post6
 scikit-learn==0.21.0
